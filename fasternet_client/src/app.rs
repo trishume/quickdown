@@ -1,11 +1,22 @@
 use webrender::api::*;
 use glutin;
+use style::{Theme, BuiltTheme, BuiltTextBlock};
+use fasternet_common::TextBlock;
 
 pub struct App {
-
+    built_theme: BuiltTheme,
+    built_block: BuiltTextBlock,
 }
 
 impl App {
+    pub fn new(api: &RenderApi) -> Self {
+        let theme = Theme::new();
+        let built_theme = BuiltTheme::new(&theme, api);
+        let block = TextBlock::example();
+        let built_block = BuiltTextBlock::new(&block, &built_theme, api);
+        App { built_theme, built_block }
+    }
+
     pub fn render(&mut self,
               _api: &RenderApi,
               builder: &mut DisplayListBuilder,
@@ -23,37 +34,24 @@ impl App {
                                       MixBlendMode::Normal,
                                       Vec::new());
 
-        let grid_rows: usize = 10;
-        let grid_cols: usize = 10;
-        let padding = 10.0;
-
-        let cell_size = LayoutSize::new(
-            (layout_size.width-padding) / (grid_cols as f32),
-            (layout_size.height-padding) / (grid_rows as f32));
-        let rect_size = cell_size - LayoutSize::new(padding, padding);
-
-        for r in 0..grid_rows {
-            for c in 0..grid_cols {
-                let pt = LayoutPoint::new(
-                    padding+(c as f32)*cell_size.width,
-                    padding+(r as f32)*cell_size.height);
-                let rect = PrimitiveInfo::new(LayoutRect::new(pt, rect_size));
-                builder.push_rect(&rect, ColorF::new(1.0, 1.0, 1.0, 1.0));
-            }
-        }
+        self.built_block.draw(builder, LayoutPoint::new(10.0,20.0));
 
         builder.pop_stacking_context();
     }
 
     pub fn on_event(&mut self,
                 event: glutin::WindowEvent,
-                api: &RenderApi,
-                document_id: DocumentId) -> bool {
+                _api: &RenderApi,
+                _document_id: DocumentId) -> bool {
         match event {
-            glutin::WindowEvent::Resized(w, h) => return true,
+            glutin::WindowEvent::Resized(_w, _h) => return true,
             _ => ()
         }
 
         false
+    }
+
+    pub fn bg_color(&self) -> ColorF {
+        self.built_theme.bg_color
     }
 }

@@ -1,8 +1,11 @@
 extern crate gleam;
 extern crate glutin;
+extern crate fasternet_common;
+extern crate app_units;
 extern crate webrender;
 
 mod app;
+mod style;
 
 use gleam::gl;
 use glutin::GlContext;
@@ -35,7 +38,7 @@ impl RenderNotifier for Notifier {
     }
 }
 
-pub fn run(app: &mut App) {
+pub fn main() {
     let mut events_loop = glutin::EventsLoop::new();
     let window_builder = glutin::WindowBuilder::new()
         .with_multitouch()
@@ -60,6 +63,8 @@ pub fn run(app: &mut App) {
     let opts = webrender::RendererOptions {
         debug: true,
         precache_shaders: false,
+        enable_subpixel_aa: false, // TODO decide
+        enable_aa: true,
         device_pixel_ratio: gl_window.hidpi_factor(),
         .. webrender::RendererOptions::default()
     };
@@ -72,13 +77,16 @@ pub fn run(app: &mut App) {
     let notifier = Box::new(Notifier::new(events_loop.create_proxy()));
     renderer.set_render_notifier(notifier);
 
+    let mut app = App::new(&api);
+
     let epoch = Epoch(0);
-    let root_background_color = ColorF::new(0.3, 0.0, 0.0, 1.0);
+    let root_background_color = app.bg_color();
 
     let pipeline_id = PipelineId(0, 0);
     let layout_size = LayoutSize::new(width as f32, height as f32);
     let mut builder = DisplayListBuilder::new(pipeline_id, layout_size);
     let mut resources = ResourceUpdates::new();
+
 
     app.render(&api, &mut builder, &mut resources, layout_size, pipeline_id, document_id);
     api.set_display_list(
@@ -137,15 +145,10 @@ pub fn run(app: &mut App) {
         }
 
         renderer.update();
-        renderer.render(DeviceUintSize::new(width, height));
+        renderer.render(DeviceUintSize::new(width, height)).unwrap();
         gl_window.swap_buffers().ok();
         glutin::ControlFlow::Continue
     });
 
     renderer.deinit();
-}
-
-fn main() {
-    let mut app = App {};
-    run(&mut app);
 }

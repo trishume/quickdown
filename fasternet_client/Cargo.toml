@@ -9,6 +9,7 @@ webrender = { git = "https://github.com/servo/webrender" }
 # servo-glutin = "0.11"     # for the example apps
 gleam = "0.4.8"
 # glutin = "0.9.2"
+app_units = "0.5.6"
 glutin = { git = "https://github.com/tomaka/glutin" }
 
 # [replace]
