@@ -1,0 +1,8 @@
+[workspace]
+members = [
+  "fasternet_client",
+  "fasternet_common",
+]
+
+# [profile.release]
+# debug = true

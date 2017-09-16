@@ -1,0 +1,11 @@
+[root]
+name = "fasternet_common"
+version = "0.1.0"
+
+[[package]]
+name = "fasternet_client"
+version = "0.1.0"
+dependencies = [
+ "fasternet_common 0.1.0",
+]
+
