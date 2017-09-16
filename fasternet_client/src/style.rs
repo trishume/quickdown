@@ -20,6 +20,7 @@ pub struct BuiltChunkStyle {
     style: ChunkStyle,
     font_key: FontKey,
     font_instance: FontInstanceKey,
+    char_width: f32,
 }
 
 pub struct Theme {
@@ -36,12 +37,13 @@ pub struct BuiltTheme {
 
 pub struct BuiltTextBlock {
     glyphs: Vec<u32>,
-    advances: Vec<f32>,
+    // advances: Vec<f32>,
     chunks: Vec<BuiltChunk>,
 }
 
 pub struct BuiltChunk {
     range: Range<usize>,
+    char_width: f32,
     font_instance: FontInstanceKey,
     color: ColorF,
     newline: bool,
@@ -89,7 +91,8 @@ impl BuiltTheme {
             let font_key: FontKey = fonts[style.font];
             // TODO don't create redundant instances
             let font_instance = Self::add_font_instance(api, font_key, style.size);
-            let built = BuiltChunkStyle { style: style.clone(), font_instance, font_key };
+            let char_width = Self::find_char_width(api, font_key, style.size);
+            let built = BuiltChunkStyle { style: style.clone(), font_instance, font_key, char_width };
             (k.clone(), built)
         }).collect();
 
@@ -128,40 +131,9 @@ impl BuiltTheme {
         api.update_resources(update);
         key
     }
-}
 
-impl BuiltTextBlock {
-    pub fn new(block: &TextBlock, theme: &BuiltTheme, api: &RenderApi) -> Self {
-        let mut indices = Vec::with_capacity(block.content.len());
-        let mut advances = Vec::with_capacity(block.content.len());
-        let mut chunks = Vec::with_capacity(block.chunks.len());
-
-        for chunk in &block.chunks {
-            let range = ((chunk.start as usize)..(chunk.end as usize));
-            let chunk_str = &block.content[range.clone()];
-            let style = &theme.style_map[&chunk.kind];
-            Self::layout_glyphs(api, style.font_key, chunk_str, style.style.size,
-                &mut indices, &mut advances);
-            chunks.push(BuiltChunk {
-                range,
-                font_instance: style.font_instance,
-                color: style.style.color,
-                newline: false,
-            })
-        }
-
-        BuiltTextBlock { glyphs: indices, advances, chunks }
-    }
-
-    fn layout_glyphs(api: &RenderApi, font_key: FontKey, text: &str, size: Au,
-                        indices_out: &mut Vec<u32>, advances_out: &mut Vec<f32>) {
-        // let indices_iter = api.get_glyph_indices(font_key, text).iter()
-        //                            .map(|idx| idx.unwrap_or(u32::max_value()));
-        let indices: Vec<u32> = api
-                            .get_glyph_indices(font_key, text)
-                            .iter()
-                            .map(|idx| idx.unwrap_or(u32::max_value()))
-                            .collect();
+    fn find_char_width(api: &RenderApi, font_key: FontKey, size: Au) -> f32 {
+        let index: u32 = api.get_glyph_indices(font_key, "m")[0].unwrap();
 
         let font = FontInstance::new(font_key,
                                      size,
@@ -170,20 +142,71 @@ impl BuiltTextBlock {
                                      SubpixelDirection::Horizontal,
                                      None);
         let mut keys = Vec::new();
-        for glyph_index in &indices {
-            keys.push(GlyphKey::new(*glyph_index,
-                                    LayerPoint::zero(),
-                                    FontRenderMode::Subpixel,
-                                    SubpixelDirection::Horizontal));
-        }
+        keys.push(GlyphKey::new(index,
+                                LayerPoint::zero(),
+                                FontRenderMode::Subpixel,
+                                SubpixelDirection::Horizontal));
         let metrics = api.get_glyph_dimensions(font, keys);
+        metrics[0].unwrap().advance
+    }
+}
+
+impl BuiltTextBlock {
+    pub fn new(block: &TextBlock, theme: &BuiltTheme, api: &RenderApi) -> Self {
+        let mut indices = Vec::with_capacity(block.content.len());
+        // let mut advances = Vec::with_capacity(block.content.len());
+        let mut chunks = Vec::with_capacity(block.chunks.len());
+
+        for chunk in &block.chunks {
+            let range = ((chunk.start as usize)..(chunk.end as usize));
+            let chunk_str = &block.content[range.clone()];
+            let style = &theme.style_map[&chunk.kind];
+            Self::layout_glyphs(api, style.font_key, chunk_str, style.style.size,
+                &mut indices);
+            chunks.push(BuiltChunk {
+                range,
+                char_width: style.char_width,
+                font_instance: style.font_instance,
+                color: style.style.color,
+                newline: false,
+            })
+        }
+
+        BuiltTextBlock { glyphs: indices, chunks }
+    }
+
+    fn layout_glyphs(api: &RenderApi, font_key: FontKey, text: &str, size: Au,
+                        indices_out: &mut Vec<u32>) {
+                        // indices_out: &mut Vec<u32>, advances_out: &mut Vec<f32>) {
+        // let indices_iter = api.get_glyph_indices(font_key, text).iter()
+        //                            .map(|idx| idx.unwrap_or(u32::max_value()));
+        let indices: Vec<u32> = api
+                            .get_glyph_indices(font_key, text)
+                            .iter()
+                            .map(|idx| idx.unwrap_or(u32::max_value()))
+                            .collect();
+
+        // let font = FontInstance::new(font_key,
+        //                              size,
+        //                              ColorF::new(0.0, 0.0, 0.0, 1.0),
+        //                              FontRenderMode::Subpixel,
+        //                              SubpixelDirection::Horizontal,
+        //                              None);
+        // let mut keys = Vec::new();
+        // for glyph_index in &indices {
+        //     keys.push(GlyphKey::new(*glyph_index,
+        //                             LayerPoint::zero(),
+        //                             FontRenderMode::Subpixel,
+        //                             SubpixelDirection::Horizontal));
+        // }
+        // let metrics = api.get_glyph_dimensions(font, keys);
 
         indices_out.extend(indices.into_iter());
 
-        let space_advance = size.to_f32_px() / 3.0;
-        let advances_iter = metrics.iter()
-                                   .map(|m| m.map(|dim| dim.advance).unwrap_or(space_advance));
-        advances_out.extend(advances_iter);
+        // let space_advance = size.to_f32_px() / 3.0;
+        // let advances_iter = metrics.iter()
+        //                            .map(|m| m.map(|dim| dim.advance).unwrap_or(space_advance));
+        // advances_out.extend(advances_iter);
     }
 
     pub fn draw(&self, builder: &mut DisplayListBuilder, origin: LayoutPoint) {
@@ -195,11 +218,13 @@ impl BuiltTextBlock {
 
     fn draw_chunk(&self, builder: &mut DisplayListBuilder, mut pt: LayoutPoint, chunk: &BuiltChunk) -> LayoutPoint {
         let glyphs = &self.glyphs[chunk.range.clone()];
-        let advances = &self.advances[chunk.range.clone()];
-        let glyphs = glyphs.iter().zip(advances).map(|arg| {
-            let gi = GlyphInstance { index: *arg.0 as u32,
+        // let advances = &self.advances[chunk.range.clone()];
+        // let glyphs = glyphs.iter().zip(advances).map(|arg| {
+        let glyphs = glyphs.iter().map(|glyph| {
+            let gi = GlyphInstance { index: *glyph as u32,
                                      point: pt, };
-            pt.x += *arg.1;
+            // pt.x += *arg.1;
+            pt.x += chunk.char_width;
             gi
         }).collect::<Vec<_>>();
 
