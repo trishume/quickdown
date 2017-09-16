@@ -13,7 +13,7 @@ impl App {
         let theme = Theme::new();
         let built_theme = BuiltTheme::new(&theme, api);
         let block = TextBlock::example();
-        let built_block = BuiltTextBlock::new(&block, &built_theme, api);
+        let built_block = BuiltTextBlock::new(&block, &built_theme, api, 300.0);
         App { built_theme, built_block }
     }
 
@@ -34,7 +34,7 @@ impl App {
                                       MixBlendMode::Normal,
                                       Vec::new());
 
-        self.built_block.draw(builder, LayoutPoint::new(10.0,20.0));
+        self.built_block.draw(builder, LayoutPoint::new(10.0,10.0));
 
         builder.pop_stacking_context();
     }
