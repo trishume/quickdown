@@ -6,15 +6,16 @@ It was originally intended to be something much more ambitious, but I had to sca
 
 ![Screenshot](doc/screenshot.png)
 
-## Features
+## Features / Accomplishments
 
 - **Fast:** On [my largest Markdown document](https://github.com/google/xi-editor/blob/master/doc/crdt-details.md), which is 7000 words and 100MB (uncompressed) of images, it takes 0.55s from hitting enter to start the executable to being fully loaded and interactive. After that it consistently renders frames in 6ms (160FPS) but in practice it is limited by my 60FPS monitor vsync.
 - **Supports images** with a multi-threaded image loader for maintaining fast startup times on documents with many large images.
 - **Renders formatting**: headers, **bold**, *italic*, `inline` and multi-line code blocks, lists.
+- **Cross Platform** (theoretically). In theory all the code should just work on Linux and Windows, but it's possible it requires a little fixing. I don't actually have any other machines to test with.
+- **Only 3MB**: The static executable is only 3MB, or 1MB compressed. Meaning it is a smaller download than most web pages.
 - Smooth scrolling and a resizable window.
 - Text layout: word-wraps your documents for a nice easy reading column length.
 - Relatively low memory. It takes 200mb to display my largest document, 100mb of which is just the uncompressed images. Chrome takes 400mb to display that document on Github. This readme takes 50mb, most of which is high-dpi framebuffers.
-- Retina display support.
 
 I measure the loading speed by starting the program and hitting `ESC` to quit in time so that the document just briefly flashes on screen before quitting. This gives an upper bound on startup time:
 
