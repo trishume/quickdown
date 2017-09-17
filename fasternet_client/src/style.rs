@@ -62,6 +62,12 @@ impl Theme {
             line_height: Au::from_px(16),
             font: 0,
         });
+        style_map.insert(TextKind::ParagraphBold, ChunkStyle {
+            color: ColorF::new(0.39607, 0.48235, 0.5137, 1.0),
+            size: Au::from_px(14),
+            line_height: Au::from_px(16),
+            font: 1,
+        });
         style_map.insert(TextKind::Link, ChunkStyle {
             color: ColorF::from(ColorU::new( 38, 139, 210, 255)),
             size: Au::from_px(14),
@@ -70,14 +76,21 @@ impl Theme {
         });
         style_map.insert(TextKind::Header1, ChunkStyle {
             color: ColorF::from(ColorU::new( 88, 110, 117, 255)),
-            size: Au::from_px(20),
-            line_height: Au::from_px(22),
-            font: 0,
+            size: Au::from_px(25),
+            line_height: Au::from_px(27),
+            font: 1,
+        });
+        style_map.insert(TextKind::Header2, ChunkStyle {
+            color: ColorF::from(ColorU::new( 88, 110, 117, 255)),
+            size: Au::from_px(18),
+            line_height: Au::from_px(20),
+            font: 1,
         });
         Theme {
             bg_color: ColorF::from(ColorU::new(253, 246, 227, 255)),
             fonts: vec![
                 "Roboto_Mono/RobotoMono-Regular.ttf",
+                "Roboto_Mono/RobotoMono-Bold.ttf",
                 // "Roboto/Roboto-Regular.ttf",
                 // "Open_Sans/OpenSans-Regular.ttf",
             ],
@@ -158,6 +171,14 @@ impl BuiltTheme {
     }
 }
 
+#[derive(Debug)]
+enum Token {
+    Word(usize),
+    Space,
+    Newline,
+    End,
+}
+
 impl BuiltTextBlock {
     pub fn new(block: &TextBlock, theme: &BuiltTheme, api: &RenderApi, width: f32) -> Self {
         let mut indices = Vec::with_capacity(block.content.len());
@@ -166,7 +187,7 @@ impl BuiltTextBlock {
 
         let mut x = 0.0;
         let mut height = 0.0;
-        let mut newline = true;
+        let mut first_chunk = true;
         for chunk in &block.chunks {
             let range = (chunk.start as usize)..(chunk.end as usize);
             let chunk_str = &block.content[range.clone()];
@@ -176,71 +197,97 @@ impl BuiltTextBlock {
             Self::layout_glyphs(api, style.font_key, chunk_str,
                 &mut indices);
 
-            let mut chunk_start = range.start;
-            let mut chunk_end = range.start;
-            let mut byte_iter = chunk_str.bytes();
-            'outer: loop {
-                // eat a word
-                let mut word_len = 0;
-                let split_before = loop {
-                    match byte_iter.next() {
-                        Some(b' ') => {
-                            let space_left = width - x;
-                            let chars_left = (space_left / style.char_width) as usize;
-                            let word_fits = word_len <= chars_left;
-                            word_len += 1;
-                            // println!("s_left={} c_left={} word={} - {:?}", space_left, chars_left, word_len, &block.content[chunk_start..(chunk_end+word_len)]);
-
-                            break !word_fits;
-                        },
-                        Some(b'\n') => {
-                            word_len += 1;
-                            break true;
-                        }
-                        Some(_) => word_len += 1,
-                        None => {
-                            chunk_end += word_len;
-                            x += (word_len as f32) * style.char_width;
-                            break 'outer;
-                        }
-                    }
-                };
-
-                if split_before {
-                    // split the chunk
-                    Self::push_chunk(&mut chunks, &mut height, chunk_start..chunk_end, &style, newline);
-                    newline = true;
-                    chunk_start = chunk_end;
-                    chunk_end = chunk_end + word_len;
-                    x = 0.0;
-                } else {
-                    // add word to the chunk
-                    chunk_end += word_len;
-                }
-                x += (word_len as f32) * style.char_width;
-            }
-            Self::push_chunk(&mut chunks, &mut height, chunk_start..chunk_end, &style, newline);
-            newline = false;
+            Self::build_chunks(
+                &mut chunks, &mut height, &mut x,
+                range, &chunk_str, &style,
+                first_chunk, width,
+            );
+            first_chunk = false;
         }
-        println!("{:?}", chunks);
+        // println!("{:?} - {}", block.content, block.content.len());
+        // println!("{:?}", chunks);
 
         let size = LayoutSize::new(width, height);
         BuiltTextBlock { glyphs: indices, chunks, size }
     }
 
-    fn push_chunk(chunks: &mut Vec<BuiltChunk>, total_height: &mut f32, range: Range<usize>, style: &BuiltChunkStyle, newline: bool) {
-        if range.start != range.end {
+    fn build_chunks(chunks: &mut Vec<BuiltChunk>, total_height: &mut f32, x: &mut f32, range: Range<usize>,
+                    chunk_str: &str, style: &BuiltChunkStyle,  first_chunk: bool, width: f32) {
+        let mut flush_line = |range: &mut Range<usize>, newline: bool| {
+            // println!("chunk {:?} {:?} {:?}", total_height, range, newline);
             let height = style.style.line_height.to_f32_px();
             chunks.push(BuiltChunk {
                 char_width: style.char_width,
                 font_instance: style.font_instance,
                 color: style.style.color,
-                range, newline, height,
+                range: range.clone(), newline, height,
             });
             if newline {
                 *total_height = *total_height + height;
             }
+            range.start = range.end;
+        };
+
+        let mut cur_chunk = range.start..range.start;
+        let tokens = Self::tokenize(chunk_str);
+        // println!("{:?}", tokens);
+        let mut newline = first_chunk;
+        for token in tokens.into_iter() {
+            match token {
+                Token::Word(word_len) => {
+                    let space_left = width - *x;
+                    let chars_left = (space_left / style.char_width) as usize;
+                    let doesnt_fit = (space_left < 0.0) || (word_len > chars_left);
+                    // println!("s_left={} c_left={} word={} - {:?} {:?}", space_left, chars_left, word_len, &chunk_str[(cur_chunk.start-range.start)..(cur_chunk.end-range.start)], &chunk_str[(cur_chunk.end-range.start)..(cur_chunk.end+word_len-range.start)]);
+                    if doesnt_fit {
+                        flush_line(&mut cur_chunk, newline); *x = 0.0; newline = true;
+                    }
+
+                    cur_chunk.end += word_len;
+                    *x += (word_len as f32) * style.char_width;
+                },
+                Token::Space => {
+                    cur_chunk.end += 1;
+                    *x += style.char_width;
+                }
+                Token::Newline => {
+                    flush_line(&mut cur_chunk, newline); *x = 0.0; newline = true;
+                }
+                Token::End => {
+                    flush_line(&mut cur_chunk, newline);
+                }
+            }
         }
+    }
+
+    fn tokenize(chunk_str: &str) -> Vec<Token> {
+        let mut tokens = vec![];
+        let mut byte_iter = chunk_str.chars();
+        'outer: loop {
+            // read a single word
+            let mut word_len = 0;
+            loop {
+                match byte_iter.next() {
+                    Some(' ') => {
+                        if word_len > 0 { tokens.push(Token::Word(word_len)) }
+                        tokens.push(Token::Space);
+                        break;
+                    },
+                    Some('\n') => {
+                        if word_len > 0 { tokens.push(Token::Word(word_len)) }
+                        tokens.push(Token::Newline);
+                        break;
+                    }
+                    Some(_) => word_len += 1,
+                    None => {
+                        if word_len > 0 { tokens.push(Token::Word(word_len)) }
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        tokens.push(Token::End);
+        tokens
     }
 
     fn layout_glyphs(api: &RenderApi, font_key: FontKey, text: &str,
@@ -285,6 +332,7 @@ impl BuiltTextBlock {
     }
 
     fn draw_chunk(&self, builder: &mut DisplayListBuilder, mut pt: LayoutPoint, chunk: &BuiltChunk, left: f32) -> LayoutPoint {
+        if chunk.range.end == 535 { println!("{:?}", &self.glyphs.len()) }
         let glyphs = &self.glyphs[chunk.range.clone()];
 
         if chunk.newline {

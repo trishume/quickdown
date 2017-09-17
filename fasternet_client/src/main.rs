@@ -64,6 +64,7 @@ pub fn main() {
         debug: true,
         precache_shaders: false,
         enable_subpixel_aa: false, // TODO decide
+        enable_scrollbars: true,
         enable_aa: true,
         device_pixel_ratio: gl_window.hidpi_factor(),
         .. webrender::RendererOptions::default()
@@ -102,10 +103,10 @@ pub fn main() {
     api.generate_frame(document_id, None);
 
     // let gl_test = support::load(sgl);
-    gl_window.show();
+    let mut window_visible = false;
 
     events_loop.run_forever(|event| {
-        println!("{:?}", event);
+        // println!("{:?}", event);
         match event {
             glutin::Event::WindowEvent { event, .. } => {
                 match event {
@@ -127,7 +128,8 @@ pub fn main() {
                     let mut builder = DisplayListBuilder::new(pipeline_id, layout_size);
                     let mut resources = ResourceUpdates::new();
 
-                    let layout_size = LayoutSize::new(width as f32, height as f32);
+                    let dpi_scale = gl_window.hidpi_factor();
+                    let layout_size = LayoutSize::new((width as f32) / dpi_scale, (height as f32) / dpi_scale);
                     app.render(&api, &mut builder, &mut resources, layout_size, pipeline_id, document_id);
                     api.set_display_list(
                         document_id,
@@ -147,6 +149,10 @@ pub fn main() {
         renderer.update();
         renderer.render(DeviceUintSize::new(width, height)).unwrap();
         gl_window.swap_buffers().ok();
+        if !window_visible {
+            gl_window.show();
+            window_visible = true;
+        }
         glutin::ControlFlow::Continue
     });
 

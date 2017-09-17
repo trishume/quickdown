@@ -1,3 +1,7 @@
+extern crate pulldown_cmark;
+
+pub mod markdown;
+
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub struct ResourceId {
     id: usize,
