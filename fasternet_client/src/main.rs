@@ -45,6 +45,7 @@ pub fn main() {
         .with_visibility(false)
         .with_title("Fasternet Client");
     let context = glutin::ContextBuilder::new()
+        .with_vsync(true)
         .with_gl(glutin::GlRequest::GlThenGles {
             opengl_version: (3, 2),
             opengles_version: (3, 0)
@@ -64,7 +65,6 @@ pub fn main() {
         debug: true,
         precache_shaders: false,
         enable_subpixel_aa: false, // TODO decide
-        enable_scrollbars: true,
         enable_aa: true,
         device_pixel_ratio: gl_window.hidpi_factor(),
         .. webrender::RendererOptions::default()
@@ -77,14 +77,15 @@ pub fn main() {
 
     let notifier = Box::new(Notifier::new(events_loop.create_proxy()));
     renderer.set_render_notifier(notifier);
+    let pipeline_id = PipelineId(0, 0);
 
-    let mut app = App::new(&api);
+    let mut app = App::new(&api,pipeline_id);
 
     let epoch = Epoch(0);
     let root_background_color = app.bg_color();
 
-    let pipeline_id = PipelineId(0, 0);
-    let layout_size = LayoutSize::new(width as f32, height as f32);
+    let dpi_scale = gl_window.hidpi_factor();
+    let layout_size = LayoutSize::new((width as f32) / dpi_scale, (height as f32) / dpi_scale);
     let mut builder = DisplayListBuilder::new(pipeline_id, layout_size);
     let mut resources = ResourceUpdates::new();
 
@@ -122,14 +123,26 @@ pub fn main() {
                     glutin::WindowEvent::KeyboardInput {
                         input: glutin::KeyboardInput {virtual_keycode: Some(glutin::VirtualKeyCode::Escape), .. }, ..
                     } => return glutin::ControlFlow::Break,
+                    glutin::WindowEvent::KeyboardInput {
+                        input: glutin::KeyboardInput {
+                            virtual_keycode: Some(glutin::VirtualKeyCode::R),
+                            state: glutin::ElementState::Pressed, ..
+                        }, ..
+                    } => {
+                        println!("toggling profiler");
+                        let mut flags = renderer.get_debug_flags();
+                        flags.toggle(webrender::PROFILER_DBG);
+                        renderer.set_debug_flags(flags);
+                    }
                     _ => (),
                 }
-                if app.on_event(event, &api, document_id) {
+
+                let dpi_scale = gl_window.hidpi_factor();
+                let layout_size = LayoutSize::new((width as f32) / dpi_scale, (height as f32) / dpi_scale);
+                if app.on_event(event, &api, layout_size, document_id) {
                     let mut builder = DisplayListBuilder::new(pipeline_id, layout_size);
                     let mut resources = ResourceUpdates::new();
 
-                    let dpi_scale = gl_window.hidpi_factor();
-                    let layout_size = LayoutSize::new((width as f32) / dpi_scale, (height as f32) / dpi_scale);
                     app.render(&api, &mut builder, &mut resources, layout_size, pipeline_id, document_id);
                     api.set_display_list(
                         document_id,

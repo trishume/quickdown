@@ -10,13 +10,6 @@ fn end_block(blocks: &mut Vec<TextBlock>, cur_text: &mut String, chunks: &mut Ve
     blocks.push(block);
 }
 
-fn block_delimiter(tag: &Tag) -> bool {
-    match *tag {
-        Tag::Paragraph | Tag::CodeBlock(_) | Tag::Header(_) | Tag::List(_) => true,
-        _ => false,
-    }
-}
-
 fn tag_style(tag: &Tag) -> Option<TextKind> {
     match *tag {
         Tag::Paragraph | Tag::CodeBlock(_) | Tag::List(_) => Some(TextKind::Paragraph),
@@ -53,15 +46,15 @@ pub fn parse_markdown(document: &str) -> Vec<TextBlock> {
         match event {
             Event::Text(txt) => cur_text.push_str(&txt),
             Event::Start(tag) => {
-                if block_delimiter(&tag) {
-                    cur_text.clear();
-                    chunks.clear();
-                    stack.clear();
-                    last_chunk = 0;
-                }
-
                 if let Some(style) = tag_style(&tag) {
-                    add_chunk(&mut chunks, &mut stack, &mut last_chunk, cur_text.len());
+                    if stack.is_empty() {
+                        cur_text.clear();
+                        chunks.clear();
+                        stack.clear();
+                        last_chunk = 0;
+                    } else {
+                        add_chunk(&mut chunks, &mut stack, &mut last_chunk, cur_text.len());
+                    }
                     stack.push(style);
                 }
 
@@ -81,7 +74,7 @@ pub fn parse_markdown(document: &str) -> Vec<TextBlock> {
                     stack.pop();
                 }
 
-                if block_delimiter(&tag) {
+                if stack.is_empty() {
                     end_block(&mut blocks, &mut cur_text, &mut chunks);
                 }
             }

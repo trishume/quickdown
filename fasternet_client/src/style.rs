@@ -251,6 +251,7 @@ impl BuiltTextBlock {
                     *x += style.char_width;
                 }
                 Token::Newline => {
+                    cur_chunk.end += 1;
                     flush_line(&mut cur_chunk, newline); *x = 0.0; newline = true;
                 }
                 Token::End => {
@@ -332,7 +333,6 @@ impl BuiltTextBlock {
     }
 
     fn draw_chunk(&self, builder: &mut DisplayListBuilder, mut pt: LayoutPoint, chunk: &BuiltChunk, left: f32) -> LayoutPoint {
-        if chunk.range.end == 535 { println!("{:?}", &self.glyphs.len()) }
         let glyphs = &self.glyphs[chunk.range.clone()];
 
         if chunk.newline {
