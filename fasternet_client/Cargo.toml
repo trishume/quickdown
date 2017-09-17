@@ -11,6 +11,8 @@ gleam = "0.4.8"
 # glutin = "0.9.2"
 app_units = "0.5.6"
 glutin = { git = "https://github.com/tomaka/glutin" }
+image = "0.15"
+rayon = "0.8.2"
 
 # [replace]
 # 'glutin:0.9.2' = { path = "/Users/tristan/misc/glutin" }

@@ -2,6 +2,7 @@ use webrender::api::*;
 use fasternet_common::*;
 use std::collections::HashMap;
 use app_units::Au;
+use image::{self, GenericImage};
 
 use std::fs::File;
 use std::u32;
@@ -45,6 +46,16 @@ pub struct BuiltTextBlock {
     chunks: Vec<BuiltChunk>,
     pub size: LayoutSize,
     bg_color: Option<ColorF>,
+}
+
+pub struct BuiltImageBlock {
+    pub key: ImageKey,
+    pub dimensions: LayoutSize,
+}
+
+pub enum BuiltBlock {
+    Text(BuiltTextBlock),
+    Image(BuiltImageBlock),
 }
 
 #[derive(Debug)]
@@ -431,5 +442,88 @@ impl BuiltTextBlock {
              chunk.color,
              Some(options));
         pt
+    }
+}
+
+impl BuiltImageBlock {
+    pub fn new(api: &RenderApi) -> BuiltImageBlock {
+        BuiltImageBlock {
+            key: api.generate_image_key(),
+            dimensions: LayoutSize::new(0.0,0.0),
+        }
+    }
+
+    fn is_image_opaque(format: ImageFormat, bytes: &[u8]) -> bool {
+        match format {
+            ImageFormat::BGRA8 => {
+                let mut is_opaque = true;
+                for i in 0..(bytes.len() / 4) {
+                    if bytes[i * 4 + 3] != 255 {
+                        is_opaque = false;
+                        break;
+                    }
+                }
+                is_opaque
+            }
+            ImageFormat::RGB8 => true,
+            ImageFormat::RG8 => true,
+            ImageFormat::A8 => false,
+            ImageFormat::Invalid | ImageFormat::RGBAF32 => unreachable!(),
+        }
+    }
+
+    pub fn premultiply(data: &mut [u8]) {
+        for pixel in data.chunks_mut(4) {
+            let a = pixel[3] as u32;
+            let b = pixel[2] as u32;
+            let g = pixel[1] as u32;
+            let r = pixel[0] as u32;
+
+            pixel[3] = a as u8;
+            pixel[2] = ((r * a + 128) / 255) as u8;
+            pixel[1] = ((g * a + 128) / 255) as u8;
+            pixel[0] = ((b * a + 128) / 255) as u8;
+        }
+    }
+
+    pub fn load(md_path: &str, path: &str) -> (ImageDescriptor, ImageData) {
+        let mut full_path = PathBuf::new();
+        full_path.push(md_path);
+        full_path.push(path);
+        let image = image::open(full_path).unwrap();
+        let image_dims = image.dimensions();
+        let format = match image {
+            image::ImageLuma8(_) => ImageFormat::A8,
+            image::ImageRgb8(_) => ImageFormat::RGB8,
+            image::ImageRgba8(_) => ImageFormat::BGRA8,
+            _ => panic!("Unsupported format"),
+        };
+        let mut bytes = image.raw_pixels();
+        if format == ImageFormat::BGRA8 {
+            Self::premultiply(bytes.as_mut_slice());
+        }
+        let descriptor = ImageDescriptor::new(image_dims.0,
+                                              image_dims.1,
+                                              format,
+                                              Self::is_image_opaque(format, &bytes[..]));
+        let data = ImageData::new(bytes);
+        (descriptor, data)
+    }
+
+    pub fn height(&self, width: f32) -> f32 {
+        width * (self.dimensions.height / self.dimensions.width)
+    }
+
+    pub fn draw(&self, builder: &mut DisplayListBuilder, origin: LayoutPoint, width: f32) {
+        let height = self.height(width);
+        let size = LayoutSize::new(width, height);
+        let rect = LayoutRect::new(origin, size);
+        builder.push_image(
+            &PrimitiveInfo::new(rect),
+            size,
+            LayoutSize::new(0.0, 0.0),
+            ImageRendering::Auto,
+            self.key
+        );
     }
 }

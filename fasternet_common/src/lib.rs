@@ -31,6 +31,17 @@ pub struct TextBlock {
     // link_dests: Vec<ResourceLink>,
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub struct ImageBlock {
+    pub path: String,
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub enum Block {
+    Text(TextBlock),
+    Image(ImageBlock),
+}
+
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub struct Chunk {
     pub start: u16,

@@ -2,13 +2,13 @@ use pulldown_cmark::{Parser, Event, Tag};
 use std::mem;
 use super::*;
 
-fn end_block(blocks: &mut Vec<TextBlock>, cur_text: &mut String, chunks: &mut Vec<Chunk>, bg: BlockBackground) {
+fn end_block(blocks: &mut Vec<Block>, cur_text: &mut String, chunks: &mut Vec<Chunk>, bg: BlockBackground) {
     let block = TextBlock {
         content: mem::replace(cur_text, String::new()),
         chunks: mem::replace(chunks, Vec::new()),
         bg,
     };
-    blocks.push(block);
+    blocks.push(Block::Text(block));
 }
 
 fn tag_style(tag: &Tag) -> Option<TextKind> {
@@ -35,7 +35,7 @@ fn add_chunk(chunks: &mut Vec<Chunk>, stack: &mut Vec<TextKind>, last_chunk: &mu
     chunks.push(chunk);
 }
 
-pub fn parse_markdown(document: &str) -> Vec<TextBlock> {
+pub fn parse_markdown(document: &str) -> Vec<Block> {
     let parser = Parser::new(document);
 
     let mut blocks = Vec::new();
@@ -69,6 +69,9 @@ pub fn parse_markdown(document: &str) -> Vec<TextBlock> {
             Event::End(tag) => {
                 match tag {
                     Tag::Item => cur_text.push_str("\n"),
+                    Tag::Image(ref path,_) => {
+                        blocks.push(Block::Image(ImageBlock{ path: path.to_string() }))
+                    }
                     _ => (),
                 }
 

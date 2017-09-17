@@ -1,14 +1,16 @@
 use webrender::api::*;
 use glutin;
-use style::{Theme, BuiltTheme, BuiltTextBlock};
-use fasternet_common::TextBlock;
+use style::{Theme, BuiltTheme, BuiltTextBlock, BuiltBlock, BuiltImageBlock};
+use fasternet_common::{Block};
 use fasternet_common::markdown::parse_markdown;
 use std::fs::File;
+use std::collections::HashMap;
 use std::io::Read;
+use rayon::prelude::*;
 
 pub struct App {
     built_theme: BuiltTheme,
-    built_model: Vec<BuiltTextBlock>,
+    built_model: Vec<BuiltBlock>,
     cursor_position: WorldPoint,
     root_clip: ClipId,
     scroll_offset: LayoutPoint,
@@ -30,15 +32,56 @@ impl App {
         App { built_theme, built_model, cursor_position, root_clip, scroll_offset, total_height }
     }
 
-    fn build_model(model: &[TextBlock], built_theme: &BuiltTheme, api: &RenderApi, width: f32) -> (Vec<BuiltTextBlock>, f32) {
-        let built_model: Vec<BuiltTextBlock> = model.iter().map(|block| {
-            BuiltTextBlock::new(block, &built_theme, api, width)
+    fn build_model(model: &[Block], built_theme: &BuiltTheme, api: &RenderApi, width: f32) -> (Vec<BuiltBlock>, f32) {
+        let mut total_height = 0.0;
+        let mut to_load = Vec::new();
+        let mut built_model: Vec<BuiltBlock> = model.iter().map(|block| {
+            match *block {
+                Block::Text(ref text_block) => {
+                    let block = BuiltTextBlock::new(text_block, &built_theme, api, width);
+                    total_height += block.size.height + PADDING;
+                    BuiltBlock::Text(block)
+                },
+                Block::Image(ref image_block) => {
+                    let block = BuiltImageBlock::new(api);
+                    to_load.push((&image_block.path, block.key));
+                    BuiltBlock::Image(block)
+                },
+            }
         }).collect();
-        let total_height = built_model.iter().map(|block| block.size.height + PADDING).sum();
+
+        // read all files and decode images (can be in parallel)
+        let to_upload: Vec<(ImageKey, ImageDescriptor, ImageData)> =
+            to_load.par_iter().map(|&(path, key)| {
+                let (descriptor, data) = BuiltImageBlock::load(
+                    "/Users/tristan/Box/Dev/Projects/xi-mac/xi-editor/doc", // TODO
+                    path
+                );
+                (key, descriptor, data)
+        }).collect();
+
+        // patch in all aspect ratios
+        let ratios: HashMap<ImageKey,LayoutSize> = to_upload.iter().map(|&(key, ref descriptor, _)| {
+            (key, LayoutSize::new(descriptor.width as f32, descriptor.height as f32))
+        }).collect();
+        for block in built_model.iter_mut() {
+            if let BuiltBlock::Image(ref mut image_block) = *block {
+                image_block.dimensions = ratios[&image_block.key];
+                total_height += image_block.height(WIDTH) + PADDING;
+            }
+        }
+
+        // upload all the images to Webrender
+        let mut updates = ResourceUpdates::new();
+        for (key, descriptor, data) in to_upload.into_iter() {
+            updates.add_image(key, descriptor, data, None);
+        }
+        api.update_resources(updates);
+
         (built_model, total_height)
     }
 
-    fn load_model() -> Vec<TextBlock> {
+    fn load_model() -> Vec<Block> {
         let mut f = File::open("/Users/tristan/Box/Dev/Projects/xi-mac/xi-editor/doc/crdt-details.md").unwrap();
         // let mut f = File::open("Readme.md").unwrap();
         let mut buffer = String::new();
@@ -77,8 +120,16 @@ impl App {
         let x = (layout_size.width - WIDTH) / 2.0;
         let mut y = 10.0;
         for block in &self.built_model {
-            block.draw(builder, LayoutPoint::new(x, y));
-            y += block.size.height + PADDING;
+            match *block {
+                BuiltBlock::Text(ref text_block) => {
+                    text_block.draw(builder, LayoutPoint::new(x, y));
+                    y += text_block.size.height + PADDING;
+                }
+                BuiltBlock::Image(ref image_block) =>  {
+                    image_block.draw(builder, LayoutPoint::new(x, y), WIDTH);
+                    y += image_block.height(WIDTH) + PADDING;
+                },
+            }
         }
 
         builder.pop_clip_id();

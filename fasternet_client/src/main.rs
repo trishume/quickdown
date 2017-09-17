@@ -3,6 +3,8 @@ extern crate glutin;
 extern crate fasternet_common;
 extern crate app_units;
 extern crate webrender;
+extern crate image;
+extern crate rayon;
 
 mod app;
 mod style;
