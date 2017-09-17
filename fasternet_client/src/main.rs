@@ -81,7 +81,8 @@ pub fn main() {
     renderer.set_render_notifier(notifier);
     let pipeline_id = PipelineId(0, 0);
 
-    let mut app = App::new(&api,pipeline_id);
+    let args: Vec<String> = std::env::args().collect();
+    let mut app = App::new(&api,pipeline_id, &args[1]);
 
     let epoch = Epoch(0);
     let root_background_color = app.bg_color();

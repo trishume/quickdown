@@ -7,7 +7,7 @@ use image::{self, GenericImage};
 use std::fs::File;
 use std::u32;
 use std::ops::Range;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use std::io::{self, Read};
 
 #[derive(Debug, Clone)]
@@ -486,7 +486,7 @@ impl BuiltImageBlock {
         }
     }
 
-    pub fn load(md_path: &str, path: &str) -> (ImageDescriptor, ImageData) {
+    pub fn load(md_path: &Path, path: &str) -> (ImageDescriptor, ImageData) {
         let mut full_path = PathBuf::new();
         full_path.push(md_path);
         full_path.push(path);

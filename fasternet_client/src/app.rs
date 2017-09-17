@@ -6,6 +6,7 @@ use fasternet_common::markdown::parse_markdown;
 use std::fs::File;
 use std::collections::HashMap;
 use std::io::Read;
+use std::path::Path;
 use rayon::prelude::*;
 
 pub struct App {
@@ -21,18 +22,20 @@ const WIDTH: f32 = 680.0;
 const PADDING: f32 = 20.0;
 
 impl App {
-    pub fn new(api: &RenderApi, pipeline_id: PipelineId) -> Self {
+    pub fn new(api: &RenderApi, pipeline_id: PipelineId, path: &str) -> Self {
         let theme = Theme::new();
         let built_theme = BuiltTheme::new(&theme, api);
-        let model = Self::load_model();
-        let (built_model, total_height) = Self::build_model(&model, &built_theme, &api, WIDTH);
+        let model = Self::load_model(&path);
+        let res_folder = Path::new(&path).parent().unwrap();
+
+        let (built_model, total_height) = Self::build_model(&model, &built_theme, &api, WIDTH, &res_folder);
         let root_clip = ClipId::new(1, pipeline_id);
         let cursor_position = WorldPoint::new(0.0,0.0);
         let scroll_offset = LayoutPoint::zero();
         App { built_theme, built_model, cursor_position, root_clip, scroll_offset, total_height }
     }
 
-    fn build_model(model: &[Block], built_theme: &BuiltTheme, api: &RenderApi, width: f32) -> (Vec<BuiltBlock>, f32) {
+    fn build_model(model: &[Block], built_theme: &BuiltTheme, api: &RenderApi, width: f32, res_folder: &Path) -> (Vec<BuiltBlock>, f32) {
         let mut total_height = 0.0;
         let mut to_load = Vec::new();
         let mut built_model: Vec<BuiltBlock> = model.iter().map(|block| {
@@ -53,10 +56,7 @@ impl App {
         // read all files and decode images (can be in parallel)
         let to_upload: Vec<(ImageKey, ImageDescriptor, ImageData)> =
             to_load.par_iter().map(|&(path, key)| {
-                let (descriptor, data) = BuiltImageBlock::load(
-                    "/Users/tristan/Box/Dev/Projects/xi-mac/xi-editor/doc", // TODO
-                    path
-                );
+                let (descriptor, data) = BuiltImageBlock::load(res_folder, path);
                 (key, descriptor, data)
         }).collect();
 
@@ -81,8 +81,8 @@ impl App {
         (built_model, total_height)
     }
 
-    fn load_model() -> Vec<Block> {
-        let mut f = File::open("/Users/tristan/Box/Dev/Projects/xi-mac/xi-editor/doc/crdt-details.md").unwrap();
+    fn load_model(path: &str) -> Vec<Block> {
+        let mut f = File::open(path).unwrap();
         // let mut f = File::open("Readme.md").unwrap();
         let mut buffer = String::new();
         f.read_to_string(&mut buffer).unwrap();
