@@ -45,7 +45,7 @@ pub fn main() {
     let window_builder = glutin::WindowBuilder::new()
         .with_multitouch()
         .with_visibility(false)
-        .with_title("Fasternet Client");
+        .with_title("Quickdown");
     let context = glutin::ContextBuilder::new()
         .with_vsync(true)
         .with_gl(glutin::GlRequest::GlThenGles {
