@@ -44,6 +44,8 @@ pub enum TextKind {
     Header2,
     Paragraph,
     ParagraphBold,
+    ParagraphItalic,
+    ParagraphCode,
     Link,
 }
 

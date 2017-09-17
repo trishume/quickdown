@@ -15,6 +15,7 @@ pub struct ChunkStyle {
     size: Au,
     line_height: Au,
     font: usize,
+    bg_color: Option<ColorF>,
 }
 
 pub struct BuiltChunkStyle {
@@ -51,6 +52,7 @@ pub struct BuiltChunk {
     font_instance: FontInstanceKey,
     color: ColorF,
     newline: bool,
+    bg_color: Option<ColorF>,
 }
 
 impl Theme {
@@ -61,36 +63,56 @@ impl Theme {
             size: Au::from_px(14),
             line_height: Au::from_px(16),
             font: 0,
+            bg_color: None,
+        });
+        style_map.insert(TextKind::ParagraphCode, ChunkStyle {
+            color: ColorF::new(0.39607, 0.48235, 0.5137, 1.0),
+            size: Au::from_px(14),
+            line_height: Au::from_px(16),
+            font: 0,
+            bg_color: Some(ColorF::new(0.9333, 0.9098, 0.8352, 1.0)),
         });
         style_map.insert(TextKind::ParagraphBold, ChunkStyle {
             color: ColorF::new(0.39607, 0.48235, 0.5137, 1.0),
             size: Au::from_px(14),
             line_height: Au::from_px(16),
             font: 1,
+            bg_color: None,
+        });
+        style_map.insert(TextKind::ParagraphItalic, ChunkStyle {
+            color: ColorF::new(0.39607, 0.48235, 0.5137, 1.0),
+            size: Au::from_px(14),
+            line_height: Au::from_px(16),
+            font: 2,
+            bg_color: None,
         });
         style_map.insert(TextKind::Link, ChunkStyle {
             color: ColorF::from(ColorU::new( 38, 139, 210, 255)),
             size: Au::from_px(14),
             line_height: Au::from_px(16),
             font: 0,
+            bg_color: None,
         });
         style_map.insert(TextKind::Header1, ChunkStyle {
             color: ColorF::from(ColorU::new( 88, 110, 117, 255)),
             size: Au::from_px(25),
             line_height: Au::from_px(27),
             font: 1,
+            bg_color: None,
         });
         style_map.insert(TextKind::Header2, ChunkStyle {
             color: ColorF::from(ColorU::new( 88, 110, 117, 255)),
             size: Au::from_px(18),
             line_height: Au::from_px(20),
             font: 1,
+            bg_color: None,
         });
         Theme {
             bg_color: ColorF::from(ColorU::new(253, 246, 227, 255)),
             fonts: vec![
                 "Roboto_Mono/RobotoMono-Regular.ttf",
                 "Roboto_Mono/RobotoMono-Bold.ttf",
+                "Roboto_Mono/RobotoMono-Italic.ttf",
                 // "Roboto/Roboto-Regular.ttf",
                 // "Open_Sans/OpenSans-Regular.ttf",
             ],
@@ -214,18 +236,21 @@ impl BuiltTextBlock {
     fn build_chunks(chunks: &mut Vec<BuiltChunk>, total_height: &mut f32, x: &mut f32, range: Range<usize>,
                     chunk_str: &str, style: &BuiltChunkStyle,  first_chunk: bool, width: f32) {
         let mut flush_line = |range: &mut Range<usize>, newline: bool| {
-            // println!("chunk {:?} {:?} {:?}", total_height, range, newline);
-            let height = style.style.line_height.to_f32_px();
-            chunks.push(BuiltChunk {
-                char_width: style.char_width,
-                font_instance: style.font_instance,
-                color: style.style.color,
-                range: range.clone(), newline, height,
-            });
-            if newline {
-                *total_height = *total_height + height;
+            if range.start != range.end {
+                // println!("chunk {:?} {:?} {:?}", total_height, range, newline);
+                let height = style.style.line_height.to_f32_px();
+                chunks.push(BuiltChunk {
+                    char_width: style.char_width,
+                    font_instance: style.font_instance,
+                    color: style.style.color,
+                    bg_color: style.style.bg_color,
+                    range: range.clone(), newline, height,
+                });
+                if newline {
+                    *total_height = *total_height + height;
+                }
+                range.start = range.end;
             }
-            range.start = range.end;
         };
 
         let mut cur_chunk = range.start..range.start;
@@ -355,6 +380,21 @@ impl BuiltTextBlock {
         let rect = LayoutRect::new(LayoutPoint::new(text_start_x, pt.y - chunk.height),
                                    LayoutSize::new((glyphs.len() as f32)*chunk.char_width,chunk.height*1.2));
         let info = LayoutPrimitiveInfo::new(rect);
+
+        if let Some(color) = chunk.bg_color {
+            let rect = rect.translate(&LayoutVector2D::new(0.0, chunk.height * 0.1));
+            let rect = rect.inflate(1.5,0.0);
+            let clip = ComplexClipRegion {
+                rect, radii: BorderRadius::uniform(5.0)
+            };
+            let info = LayoutPrimitiveInfo {
+                rect, is_backface_visible: false,
+                local_clip: Some(LocalClip::RoundedRect(rect, clip)),
+            };
+            // let rect = rect.scale(1.1,1.0);
+            builder.push_rect(&info, color);
+        }
+
         let options = GlyphOptions {
             render_mode: FontRenderMode::Subpixel,
         };

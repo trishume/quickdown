@@ -16,7 +16,9 @@ fn tag_style(tag: &Tag) -> Option<TextKind> {
         Tag::Header(1) => Some(TextKind::Header1),
         Tag::Header(_) => Some(TextKind::Header2),
         Tag::Link(_,_) => Some(TextKind::Link),
-        Tag::Strong | Tag::Emphasis => Some(TextKind::ParagraphBold),
+        Tag::Strong => Some(TextKind::ParagraphBold),
+        Tag::Emphasis => Some(TextKind::ParagraphItalic),
+        Tag::Code => Some(TextKind::ParagraphCode),
         _ => None,
     }
 }
