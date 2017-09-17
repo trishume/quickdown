@@ -29,10 +29,12 @@ pub struct Theme {
     bg_color: ColorF,
     fonts: Vec<&'static str>,
     style_map: HashMap<TextKind, ChunkStyle>,
+    code_bg: ColorF,
 }
 
 pub struct BuiltTheme {
     pub bg_color: ColorF,
+    code_bg: ColorF,
     // fonts: Vec<FontKey>,
     style_map: HashMap<TextKind, BuiltChunkStyle>,
 }
@@ -42,6 +44,7 @@ pub struct BuiltTextBlock {
     // advances: Vec<f32>,
     chunks: Vec<BuiltChunk>,
     pub size: LayoutSize,
+    bg_color: Option<ColorF>,
 }
 
 #[derive(Debug)]
@@ -109,6 +112,7 @@ impl Theme {
         });
         Theme {
             bg_color: ColorF::from(ColorU::new(253, 246, 227, 255)),
+            code_bg:  ColorF::new(0.9333, 0.9098, 0.8352, 1.0),
             fonts: vec![
                 "Roboto_Mono/RobotoMono-Regular.ttf",
                 "Roboto_Mono/RobotoMono-Bold.ttf",
@@ -140,6 +144,7 @@ impl BuiltTheme {
 
         BuiltTheme {
             bg_color: theme.bg_color,
+            code_bg: theme.code_bg,
             // fonts,
             style_map,
         }
@@ -224,13 +229,21 @@ impl BuiltTextBlock {
                 range, &chunk_str, &style,
                 first_chunk, width,
             );
+            // TODO incorrect fudge for descenders
+            if first_chunk {
+                height += style.style.size.to_f32_px() * 0.3;
+            }
             first_chunk = false;
         }
         // println!("{:?} - {}", block.content, block.content.len());
         // println!("{:?}", chunks);
 
         let size = LayoutSize::new(width, height);
-        BuiltTextBlock { glyphs: indices, chunks, size }
+        let bg_color = match block.bg {
+            BlockBackground::NoBackground => None,
+            BlockBackground::Code => Some(theme.code_bg),
+        };
+        BuiltTextBlock { glyphs: indices, chunks, size, bg_color }
     }
 
     fn build_chunks(chunks: &mut Vec<BuiltChunk>, total_height: &mut f32, x: &mut f32, range: Range<usize>,
@@ -351,6 +364,20 @@ impl BuiltTextBlock {
     }
 
     pub fn draw(&self, builder: &mut DisplayListBuilder, origin: LayoutPoint) {
+        if let Some(color) = self.bg_color {
+            let rect = LayoutRect::new(origin, self.size);
+            let rect = rect.inflate(3.0,3.0);
+            let clip = ComplexClipRegion {
+                rect, radii: BorderRadius::uniform(5.0)
+            };
+            let info = LayoutPrimitiveInfo {
+                rect, is_backface_visible: false,
+                local_clip: Some(LocalClip::RoundedRect(rect, clip)),
+            };
+            // let rect = rect.scale(1.1,1.0);
+            builder.push_rect(&info, color);
+        }
+
         let mut pt = origin;
         for chunk in &self.chunks {
             pt = self.draw_chunk(builder, pt, chunk, origin.x);

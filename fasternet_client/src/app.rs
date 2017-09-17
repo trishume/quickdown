@@ -15,7 +15,8 @@ pub struct App {
     total_height: f32,
 }
 
-const WIDTH: f32 = 660.0;
+const WIDTH: f32 = 680.0;
+const PADDING: f32 = 20.0;
 
 impl App {
     pub fn new(api: &RenderApi, pipeline_id: PipelineId) -> Self {
@@ -33,7 +34,7 @@ impl App {
         let built_model: Vec<BuiltTextBlock> = model.iter().map(|block| {
             BuiltTextBlock::new(block, &built_theme, api, width)
         }).collect();
-        let total_height = built_model.iter().map(|block| block.size.height + 20.0).sum();
+        let total_height = built_model.iter().map(|block| block.size.height + PADDING).sum();
         (built_model, total_height)
     }
 
@@ -77,7 +78,7 @@ impl App {
         let mut y = 10.0;
         for block in &self.built_model {
             block.draw(builder, LayoutPoint::new(x, y));
-            y += block.size.height + 20.0;
+            y += block.size.height + PADDING;
         }
 
         builder.pop_clip_id();

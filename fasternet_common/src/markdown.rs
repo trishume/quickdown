@@ -2,10 +2,11 @@ use pulldown_cmark::{Parser, Event, Tag};
 use std::mem;
 use super::*;
 
-fn end_block(blocks: &mut Vec<TextBlock>, cur_text: &mut String, chunks: &mut Vec<Chunk>) {
+fn end_block(blocks: &mut Vec<TextBlock>, cur_text: &mut String, chunks: &mut Vec<Chunk>, bg: BlockBackground) {
     let block = TextBlock {
         content: mem::replace(cur_text, String::new()),
         chunks: mem::replace(chunks, Vec::new()),
+        bg,
     };
     blocks.push(block);
 }
@@ -76,8 +77,13 @@ pub fn parse_markdown(document: &str) -> Vec<TextBlock> {
                     stack.pop();
                 }
 
-                if stack.is_empty() {
-                    end_block(&mut blocks, &mut cur_text, &mut chunks);
+                if stack.is_empty() && !cur_text.is_empty() {
+                    let bg = if let Tag::CodeBlock(_) = tag {
+                        BlockBackground::Code
+                    } else {
+                        BlockBackground::NoBackground
+                    };
+                    end_block(&mut blocks, &mut cur_text, &mut chunks, bg);
                 }
             }
             _ => ()

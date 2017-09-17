@@ -27,6 +27,7 @@ pub struct BlockHeader {
 pub struct TextBlock {
     pub content: String,
     pub chunks: Vec<Chunk>,
+    pub bg: BlockBackground,
     // link_dests: Vec<ResourceLink>,
 }
 
@@ -39,6 +40,12 @@ pub struct Chunk {
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub enum BlockBackground {
+    NoBackground,
+    Code,
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum TextKind {
     Header1,
     Header2,
@@ -47,20 +54,4 @@ pub enum TextKind {
     ParagraphItalic,
     ParagraphCode,
     Link,
-}
-
-impl TextBlock {
-    pub fn example() -> Self {
-        let txt = "the quick brown fox jumps over the lazy dog! Even though the dog was testing the text wrapping at the time. The text wrapping was working pretty well by the way, in case you were wondering.";
-        let chunks = vec![
-            Chunk { start: 0, end: 9, kind: TextKind::Paragraph },
-            Chunk { start: 9, end: 16, kind: TextKind::Paragraph },
-            Chunk { start: 16, end: 19, kind: TextKind::Link },
-            Chunk { start: 19, end: txt.len() as u16, kind: TextKind::Paragraph },
-        ];
-        TextBlock {
-            content: txt.to_owned(),
-            chunks,
-        }
-    }
 }
