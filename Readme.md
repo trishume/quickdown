@@ -1,6 +1,6 @@
 # Quickdown
 
-Quickdown is a fast lightweight cross-platform markdown viewer, for now. It was my project for Hack the North 2017. It's written in Rust and uses Webrender for efficient GPU rendering of large text documents.
+Quickdown is a fast lightweight cross-platform markdown viewer. It was written in 16 hours for Hack the North 2017. It's written in Rust and uses Webrender for efficient GPU rendering of large text documents. It's not polished for everyday use yet, it's mostly useful as a tech demo / example of how to use Webrender for UI-like things. But if someone really wants to use this I will review and accept your PRs to polish it.
 
 It was originally intended to be something much more ambitious, but I had to scale down my ambitions due to time constraints. See the "Background" section.
 

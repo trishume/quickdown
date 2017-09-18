@@ -66,7 +66,7 @@ pub fn main() {
     let opts = webrender::RendererOptions {
         debug: true,
         precache_shaders: false,
-        enable_subpixel_aa: false, // TODO decide
+        enable_subpixel_aa: true, // TODO decide
         enable_aa: true,
         device_pixel_ratio: gl_window.hidpi_factor(),
         .. webrender::RendererOptions::default()
