@@ -12,31 +12,34 @@ mod style;
 use gleam::gl;
 use glutin::GlContext;
 use webrender::api::*;
+use std::sync::Arc;
 // use webrender::{PROFILER_DBG, RENDER_TARGET_DBG, TEXTURE_CACHE_DBG};
 
 use app::App;
 
 struct Notifier {
-    loop_proxy: glutin::EventsLoopProxy,
+    loop_proxy: Arc<glutin::EventsLoopProxy>,
 }
 
 impl Notifier {
     fn new(loop_proxy: glutin::EventsLoopProxy)-> Notifier {
         Notifier {
-            loop_proxy,
+            loop_proxy: Arc::new(loop_proxy),
         }
     }
 }
 
 impl RenderNotifier for Notifier {
-    fn new_frame_ready(&mut self) {
-        #[cfg(not(target_os = "android"))]
+    fn new_document_ready(&self, _id: DocumentId, _scrolled: bool, _composite_needed: bool) {
+        self.wake_up();
+    }
+
+    fn wake_up(&self) {
         self.loop_proxy.wakeup().unwrap();
     }
 
-    fn new_scroll_frame_ready(&mut self, _composite_needed: bool) {
-        #[cfg(not(target_os = "android"))]
-        self.loop_proxy.wakeup().unwrap();
+    fn clone(&self) -> Box<RenderNotifier + 'static> {
+        Box::new(Notifier{ loop_proxy: self.loop_proxy.clone() })
     }
 }
 
@@ -73,12 +76,12 @@ pub fn main() {
     };
 
     let size = DeviceUintSize::new(width, height);
-    let (mut renderer, sender) = webrender::Renderer::new(gl, opts).unwrap();
-    let api = sender.create_api();
-    let document_id = api.add_document(size);
-
     let notifier = Box::new(Notifier::new(events_loop.create_proxy()));
-    renderer.set_render_notifier(notifier);
+    let (mut renderer, sender) = webrender::Renderer::new(gl, notifier, opts).unwrap();
+    let api = sender.create_api();
+    let document_id = api.add_document(size, 0);
+
+    // renderer.set_render_notifier(notifier);
     let pipeline_id = PipelineId(0, 0);
 
     let args: Vec<String> = std::env::args().collect();
@@ -120,7 +123,7 @@ pub fn main() {
                         height = h;
                         let size = DeviceUintSize::new(width, height);
                         let rect = DeviceUintRect::new(DeviceUintPoint::zero(), size);
-                        api.set_window_parameters(document_id, size, rect);
+                        api.set_window_parameters(document_id, size, rect, gl_window.hidpi_factor());
                     },
                     glutin::WindowEvent::Closed |
                     glutin::WindowEvent::KeyboardInput {
@@ -133,9 +136,7 @@ pub fn main() {
                         }, ..
                     } => {
                         println!("toggling profiler");
-                        let mut flags = renderer.get_debug_flags();
-                        flags.toggle(webrender::PROFILER_DBG);
-                        renderer.set_debug_flags(flags);
+                        renderer.toggle_debug_flags(webrender::DebugFlags::PROFILER_DBG | webrender::DebugFlags::GPU_TIME_QUERIES);
                     }
                     _ => (),
                 }

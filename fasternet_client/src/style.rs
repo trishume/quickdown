@@ -147,8 +147,8 @@ impl BuiltTheme {
         let style_map = theme.style_map.iter().map(|(k, style)| {
             let font_key: FontKey = fonts[style.font];
             // TODO don't create redundant instances
-            let font_instance = Self::add_font_instance(api, font_key, style.size);
-            let char_width = Self::find_char_width(api, font_key, style.size);
+            let font_instance = Self::add_font_instance(api, font_key, style.size, style.bg_color.unwrap_or(theme.bg_color));
+            let char_width = Self::find_char_width(api, font_key, font_instance, style.size);
             let built = BuiltChunkStyle { style: style.clone(), font_instance, font_key, char_width };
             (k.clone(), built)
         }).collect();
@@ -171,13 +171,16 @@ impl BuiltTheme {
         Ok(bytes)
     }
 
-    pub fn add_font_instance(api: &RenderApi, font_key: FontKey, size: Au) -> FontInstanceKey {
+    pub fn add_font_instance(api: &RenderApi, font_key: FontKey, size: Au, bg_color: ColorF) -> FontInstanceKey {
         let key = api.generate_font_instance_key();
         let mut update = ResourceUpdates::new();
-        let options = FontInstanceOptions {
-            render_mode: FontRenderMode::Subpixel,
-        };
-        update.add_font_instance(key, font_key, size, Some(options), None);
+        // let options = FontInstanceOptions {
+        //     render_mode: FontRenderMode::Subpixel,
+        //     subpx_dir: SubpixelDirection::Horizontal,
+        //     synthetic_italics: false,
+        //     bg_color,
+        // };
+        update.add_font_instance(key, font_key, size, None, None, Vec::new());
         api.update_resources(update);
         key
     }
@@ -190,21 +193,14 @@ impl BuiltTheme {
         key
     }
 
-    fn find_char_width(api: &RenderApi, font_key: FontKey, size: Au) -> f32 {
+    fn find_char_width(api: &RenderApi, font_key: FontKey, instance: FontInstanceKey, size: Au) -> f32 {
         let index: u32 = api.get_glyph_indices(font_key, "m")[0].unwrap();
-
-        let font = FontInstance::new(font_key,
-                                     size,
-                                     ColorF::new(0.0, 0.0, 0.0, 1.0),
-                                     FontRenderMode::Subpixel,
-                                     SubpixelDirection::Horizontal,
-                                     None);
         let mut keys = Vec::new();
         keys.push(GlyphKey::new(index,
                                 LayerPoint::zero(),
                                 FontRenderMode::Subpixel,
                                 SubpixelDirection::Horizontal));
-        let metrics = api.get_glyph_dimensions(font, keys);
+        let metrics = api.get_glyph_dimensions(instance, keys);
         metrics[0].unwrap().advance
     }
 }
@@ -379,12 +375,10 @@ impl BuiltTextBlock {
             let rect = LayoutRect::new(origin, self.size);
             let rect = rect.inflate(3.0,3.0);
             let clip = ComplexClipRegion {
-                rect, radii: BorderRadius::uniform(5.0)
+                rect, radii: BorderRadius::uniform(5.0),
+                mode: ClipMode::Clip,
             };
-            let info = LayoutPrimitiveInfo {
-                rect, is_backface_visible: false,
-                local_clip: Some(LocalClip::RoundedRect(rect, clip)),
-            };
+            let info = LayoutPrimitiveInfo::with_clip(rect, LocalClip::RoundedRect(rect, clip));
             // let rect = rect.scale(1.1,1.0);
             builder.push_rect(&info, color);
         }
@@ -423,12 +417,10 @@ impl BuiltTextBlock {
             let rect = rect.translate(&LayoutVector2D::new(0.0, chunk.height * 0.1));
             let rect = rect.inflate(1.5,0.0);
             let clip = ComplexClipRegion {
-                rect, radii: BorderRadius::uniform(5.0)
+                rect, radii: BorderRadius::uniform(5.0),
+                mode: ClipMode::Clip,
             };
-            let info = LayoutPrimitiveInfo {
-                rect, is_backface_visible: false,
-                local_clip: Some(LocalClip::RoundedRect(rect, clip)),
-            };
+            let info = LayoutPrimitiveInfo::with_clip(rect, LocalClip::RoundedRect(rect, clip));
             // let rect = rect.scale(1.1,1.0);
             builder.push_rect(&info, color);
         }
