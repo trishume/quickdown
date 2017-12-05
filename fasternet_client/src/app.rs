@@ -165,7 +165,7 @@ impl App {
                 api.scroll_node_with_id(document_id, self.scroll_offset,
                     self.root_clip, ScrollClamping::NoClamping);
             },
-            glutin::WindowEvent::MouseMoved { device_id: _, position: (x,y) } => {
+            glutin::WindowEvent::CursorMoved { device_id: _, position: (x,y) } => {
                 self.cursor_position = WorldPoint::new(x as f32, y as f32);
             }
             _ => ()

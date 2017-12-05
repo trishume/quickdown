@@ -64,7 +64,11 @@ pub fn main() {
         gl::GlType::Gles => unsafe { gl::GlesFns::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _) },
     };
 
-    let (mut width, mut height) = gl_window.get_inner_size_pixels().unwrap();
+    let (mut width, mut height) = gl_window.get_inner_size().unwrap();
+
+    // TODO hack until https://github.com/tomaka/winit/pull/359 is merged and integrated into glutin master
+    width = ((width as f32) * gl_window.hidpi_factor()) as u32;
+    height = ((height as f32) * gl_window.hidpi_factor()) as u32;
 
     let opts = webrender::RendererOptions {
         debug: true,

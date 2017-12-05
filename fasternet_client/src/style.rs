@@ -147,8 +147,8 @@ impl BuiltTheme {
         let style_map = theme.style_map.iter().map(|(k, style)| {
             let font_key: FontKey = fonts[style.font];
             // TODO don't create redundant instances
-            let font_instance = Self::add_font_instance(api, font_key, style.size, style.bg_color.unwrap_or(theme.bg_color));
-            let char_width = Self::find_char_width(api, font_key, font_instance, style.size);
+            let font_instance = Self::add_font_instance(api, font_key, style.size);
+            let char_width = Self::find_char_width(api, font_key, font_instance);
             let built = BuiltChunkStyle { style: style.clone(), font_instance, font_key, char_width };
             (k.clone(), built)
         }).collect();
@@ -171,7 +171,7 @@ impl BuiltTheme {
         Ok(bytes)
     }
 
-    pub fn add_font_instance(api: &RenderApi, font_key: FontKey, size: Au, bg_color: ColorF) -> FontInstanceKey {
+    pub fn add_font_instance(api: &RenderApi, font_key: FontKey, size: Au) -> FontInstanceKey {
         let key = api.generate_font_instance_key();
         let mut update = ResourceUpdates::new();
         // let options = FontInstanceOptions {
@@ -193,7 +193,7 @@ impl BuiltTheme {
         key
     }
 
-    fn find_char_width(api: &RenderApi, font_key: FontKey, instance: FontInstanceKey, size: Au) -> f32 {
+    fn find_char_width(api: &RenderApi, font_key: FontKey, instance: FontInstanceKey) -> f32 {
         let index: u32 = api.get_glyph_indices(font_key, "m")[0].unwrap();
         let mut keys = Vec::new();
         keys.push(GlyphKey::new(index,
